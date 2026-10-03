@@ -12,6 +12,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.annotation.VisibleForTesting
 import androidx.core.content.ContextCompat
@@ -134,7 +135,7 @@ class ClipboardPlugin : Plugin() {
         }
     }
 
-    private fun userInitiatedSendClipboard() {
+    fun userInitiatedSendClipboard() {
         if (isDeviceInitialized) {
             val clipboardManager = this.context.getSystemService<ClipboardManager>()!!
             val item: ClipData.Item
@@ -144,6 +145,26 @@ class ClipboardPlugin : Plugin() {
                 // Don't check if the content is sensitive, just send it
                 this.propagateClipboard(content)
                 Toast.makeText(this.context, R.string.pref_plugin_clipboard_sent, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun performSilentClipboardSync() {
+        if (isDeviceInitialized) {
+            try {
+                val clipboardManager = this.context.getSystemService<ClipboardManager>()
+                if (clipboardManager?.hasPrimaryClip() == true) {
+                    val clip = clipboardManager.primaryClip
+                    if (clip != null && clip.itemCount > 0) {
+                        val item = clip.getItemAt(0)
+                        val content = item.coerceToText(this.context).toString()
+                        if (content.isNotEmpty()) {
+                            this.propagateClipboard(content)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ClipboardPlugin", "Failed to sync clipboard", e)
             }
         }
     }

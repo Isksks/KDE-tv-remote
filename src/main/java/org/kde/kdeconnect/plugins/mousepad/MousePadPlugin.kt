@@ -177,6 +177,48 @@ class MousePadPlugin : Plugin() {
         np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_F4)
         device.sendPacket(np)
     }
+    
+    fun sendCtrlA() {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["ctrl"] = true
+        np["key"] = "a"
+        device.sendPacket(np)
+    }
+
+    fun sendCtrlC() {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["ctrl"] = true
+        np["key"] = "c"
+        device.sendPacket(np)
+    }
+
+    fun sendCtrlV() {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["ctrl"] = true
+        np["key"] = "v"
+        device.sendPacket(np)
+    }
+
+    fun sendCtrlAltT() {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["ctrl"] = true
+        np["alt"] = true
+        np["key"] = "t"
+        device.sendPacket(np)
+    }
+
+    fun sendAltF2() {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["alt"] = true
+        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_F2)
+        device.sendPacket(np)
+    }
+
+    fun sendBackspace() {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_DEL)
+        sendPacket(np)
+    }
 
     fun sendText(content: String) {
         val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)

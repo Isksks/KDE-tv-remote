@@ -13,6 +13,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.view.Choreographer;
 import android.view.GestureDetector;
 import android.view.HapticFeedbackConstants;
 import android.view.Menu;
@@ -92,6 +93,61 @@ public class MousePadActivity
 
     private boolean prefsApplied = false;
 
+    // Smoothing: movement is buffered and drained a fraction per frame
+    private static final float SMOOTHING_DRAIN = 0.5f;   // 0.3 = smoother/laggier, 0.8 = snappier
+    private float bufferX = 0f, bufferY = 0f;
+    private boolean drainScheduled = false;
+
+    private final Choreographer.FrameCallback drainCallback = new Choreographer.FrameCallback() {
+        @Override
+        public void doFrame(long frameTimeNanos) {
+            drainScheduled = false;
+            drainMouseBuffer();
+        }
+    };
+
+    private void queueMouseDelta(float dx, float dy) {
+        bufferX += dx;
+        bufferY += dy;
+        if (!drainScheduled) {
+            drainScheduled = true;
+            Choreographer.getInstance().postFrameCallback(drainCallback);
+        }
+    }
+
+    private void drainMouseBuffer() {
+        float sx, sy;
+        // Send a fraction each frame; flush the rest once it is tiny
+        if (Math.abs(bufferX) < 0.5f && Math.abs(bufferY) < 0.5f) {
+            sx = bufferX;
+            sy = bufferY;
+        } else {
+            sx = bufferX * SMOOTHING_DRAIN;
+            sy = bufferY * SMOOTHING_DRAIN;
+        }
+        bufferX -= sx;   // sum is preserved, so no movement is lost
+        bufferY -= sy;
+
+        if (sx != 0f || sy != 0f) {
+            MousePadPlugin plugin = KdeConnect.getInstance().getDevicePlugin(deviceId, MousePadPlugin.class);
+            if (plugin == null) {
+                finish();
+                return;
+            }
+            plugin.sendMouseDelta(sx, sy);
+        }
+
+        if (bufferX != 0f || bufferY != 0f) {
+            drainScheduled = true;
+            Choreographer.getInstance().postFrameCallback(drainCallback);
+        }
+    }
+
+    private void resetMouseBuffer() {
+        bufferX = 0f;
+        bufferY = 0f;
+    }
+
     private final Lazy<ActivityMousepadBinding> lazyBinding = LazyKt.lazy(() -> ActivityMousepadBinding.inflate(getLayoutInflater()));
 
     @NonNull
@@ -150,7 +206,7 @@ public class MousePadActivity
             finish();
             return;
         }
-        plugin.sendMouseDelta(nX, nY);
+        queueMouseDelta(nX, nY);
     }
 
     @Override
@@ -230,6 +286,9 @@ public class MousePadActivity
             mSensorManager.unregisterListener(this);
             gyroEnabled = false;
         }
+        Choreographer.getInstance().removeFrameCallback(drainCallback);
+        drainScheduled = false;
+        resetMouseBuffer();
         super.onPause();
     }
 
@@ -330,12 +389,26 @@ public class MousePadActivity
             return true;
         }
 
-        switch (actionType) {
+        switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 mPrevX = event.getX();
                 mPrevY = event.getY();
                 break;
+
+            case MotionEvent.ACTION_POINTER_DOWN:
+            case MotionEvent.ACTION_POINTER_UP:
+                // Finger count changed: re-anchor so there is no jump
+                int skip = (event.getActionMasked() == MotionEvent.ACTION_POINTER_UP) ? event.getActionIndex() : -1;
+                int idx = (skip == 0) ? 1 : 0;
+                if (idx < event.getPointerCount()) {
+                    mPrevX = event.getX(idx);
+                    mPrevY = event.getY(idx);
+                }
+                break;
+
             case MotionEvent.ACTION_MOVE:
+                if (event.getPointerCount() > 1) break;   // two-finger = scroll, not pointer move
+
                 float mCurrentX = event.getX();
                 float mCurrentY = event.getY();
 
@@ -343,7 +416,7 @@ public class MousePadActivity
                 float deltaY = (mCurrentY - mPrevY) * displayDpiMultiplier * mCurrentSensitivity;
 
                 if (maybeDragging) {
-                    accumulatedDragDistance2 += deltaX*deltaX + deltaY*deltaY;
+                    accumulatedDragDistance2 += deltaX * deltaX + deltaY * deltaY;
                     if (accumulatedDragDistance2 >= MinDraggingDistance2) {
                         maybeDragging = false;
                         dragging = true;
@@ -355,13 +428,14 @@ public class MousePadActivity
                     mPointerAccelerationProfile.touchMoved(deltaX, deltaY, event.getEventTime());
                     mouseDelta = mPointerAccelerationProfile.commitAcceleratedMouseDelta(mouseDelta);
 
-                    plugin.sendMouseDelta(mouseDelta.x, mouseDelta.y);
+                    queueMouseDelta(mouseDelta.x, mouseDelta.y);
                 }
 
                 mPrevX = mCurrentX;
                 mPrevY = mCurrentY;
 
                 break;
+
             case MotionEvent.ACTION_UP:
                 if (doubleTapDragEnabled && maybeDragging) {
                     maybeDragging = false;
@@ -479,6 +553,8 @@ public class MousePadActivity
 
     @Override
     public boolean onDoubleTap(MotionEvent e) {
+        mPrevX = e.getX();
+        mPrevY = e.getY();
         MousePadPlugin plugin = KdeConnect.getInstance().getDevicePlugin(deviceId, MousePadPlugin.class);
         if (plugin == null) {
             finish();

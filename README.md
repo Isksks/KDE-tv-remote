@@ -1,37 +1,57 @@
-# KDE Connect - Android app
+# KDE Remote - Custom Smart Remote App for KDE Bigscreen & Linux
 
-KDE Connect is a multi-platform app that allows your devices to communicate (eg: your phone and your computer).
+**KDE Remote** is a redesigned, premium Smart Remote application built on top of the open-source **KDE Connect** Android framework. Developed and optimized by **Anurag Kumar**, it provides a sleek, physical remote interface tailored for controlling PC desktops, KDE Bigscreen TVs, and Linux media setups.
 
-## (Some) Features
-- **Shared clipboard**: copy and paste between your phone and your computer (or any other device).
-- **Notification sync**: Read and reply to your Android notifications from the desktop.
-- **Share files and URLs** instantly from one device to another.
-- **Multimedia remote control**: Use your phone as a remote for Linux media players.
-- **Virtual touchpad**: Use your phone screen as your computer's touchpad and keyboard.
+---
 
-All this without wires, over the already existing Wi-Fi network, and using TLS encryption.
+## 🌟 Key Features & Optimizations
 
-## About this app
+- **Physical Smart Remote Interface (Claymorphism)**:
+  - Designed using Jetpack Compose with tactile, soft 3D claymorphic depth.
+  - Supports both **Icy Light** and **Deep Charcoal Dark** themes with instant runtime switching.
 
-This is a native Android port of the KDE Connect Qt app. You will find a more complete readme about KDE Connect [here](https://invent.kde.org/network/kdeconnect-kde/).
+- **Choreographer-Driven Trackpad Smoothing**:
+  - Eliminates pointer lag, network jitter, and multi-finger jumpiness on Linux.
+  - Smoothly buffers and drains pointer deltas synced to the display's exact frame rate (`Choreographer.FrameCallback`).
 
-## How to install this app
+- **Automated Sudo Shutdown Sequence**:
+  - One-tap shutdown button that automatically launches a terminal, executes `sudo shutdown now`, and submits your saved `sudo` password seamlessly.
 
-You can install this app from the [Play Store](https://play.google.com/store/apps/details?id=org.kde.kdeconnect_tp) as well as [F-Droid](https://f-droid.org/repository/browse/?fdid=org.kde.kdeconnect_tp). Note you will also need to install the [desktop app](https://invent.kde.org/network/kdeconnect-kde) for it to work.
+- **Continuous Auto-Repeat on Hold**:
+  - D-Pad directional controls (Up, Down, Left, Right), Center OK button, and Volume (+/-) controls automatically repeat input commands when held down.
 
-## Contributing
+- **Real-Time Clipboard Sync & One-Tap Paste**:
+  - Automatically syncs the Android phone's clipboard to the PC whenever copied.
+  - The dedicated **V** button auto-syncs the latest clipboard text and sends `Ctrl+V` (Paste) in a single press.
+  - Includes quick shortcut buttons for **A** (`Ctrl+A`), **C** (`Ctrl+C`), and **V** (`Ctrl+V`).
 
-A lot of useful information, including how to get started working on KDE Connect and how to connect with the current developers, is on our [KDE Community Wiki page](https://community.kde.org/KDEConnect)
+- **System Audio & Media Controls**:
+  - Features dedicated **Play / Pause** media control and **Mute** toggles powered by KDE Connect's `MprisPlugin` and `SystemVolumePlugin`.
 
-For bug reporting, please use [KDE's Bugzilla](https://bugs.kde.org). Please do not use the issue tracker in GitLab since we want to keep everything in one place.
+- **Underlying KDE Connect Security**:
+  - Uses original KDE Connect device discovery, secure TLS pairing, and communication protocols underneath without replacing or duplicating the network layer.
 
-To contribute patches, use [KDE Connect's Gitlab](https://invent.kde.org/network/kdeconnect-android/).
-On Gitlab (as well as on our [old Phabricator](https://phabricator.kde.org/tag/kde_connect/)) you can find a task list with stuff to do and links to other relevant resources.
-It is a good idea to also subscribe to the [KDE Connect mailing list](https://mail.kde.org/mailman/listinfo/kdeconnect).
+---
 
-Please know that all translations for all KDE apps are handled by the [localization team](https://l10n.kde.org/). If you would like to submit a translation, that should be done by working with the proper team for that language.
+## 📱 Developer
 
-## License
-[GNU GPL v2](https://www.gnu.org/licenses/gpl-2.0.html) and [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.html)
+Designed and developed by **Anurag Kumar**.
+- LinkedIn: [Anurag Kumar](https://www.linkedin.com/in/anurag-kumar-47271335a/?isSelfProfile=true)
+- GitHub: [Isksks](https://github.com/Isksks)
 
-If you are reading this from GitHub, you should know that this is just a mirror of the [KDE Project repo](https://invent.kde.org/network/kdeconnect-android/).
+---
+
+## 🛠️ Tech Stack & Architecture
+
+- **Language**: Kotlin & Java
+- **UI Framework**: Jetpack Compose & Material 3
+- **Architecture**: MVVM with Clean Controller abstraction (`RemoteController` → `KdeConnect` Plugins)
+- **Min SDK**: 23 (Android 6.0)
+- **Compile SDK**: 37
+
+---
+
+## 📄 License
+
+Based on the KDE Connect Android codebase.
+Licensed under [GNU GPL v2](https://www.gnu.org/licenses/gpl-2.0.html) and [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.html).
