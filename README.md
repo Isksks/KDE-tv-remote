@@ -335,6 +335,8 @@ KDE Remote is built using the excellent open-source work of the **KDE Connect** 
 
 Huge thanks to the KDE community and everyone contributing to the KDE ecosystem.
 
+my linkdin- https://www.linkedin.com/in/anurag-kumar-47271335a/?isSelfProfile=true
+
 ---
 
 ## 📄 License
@@ -349,4 +351,4 @@ See the project's license for details.
 
 **Built for KDE Plasma Bigscreen.**
 
-\</p>
+
