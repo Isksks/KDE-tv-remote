@@ -44,6 +44,7 @@ android {
         versionCode = 13517
         versionName = "1.35.17"
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        vectorDrawables.useSupportLibrary = true
     }
     buildFeatures {
         viewBinding = true
@@ -65,11 +66,19 @@ android {
 
     androidResources {
         generateLocaleConfig = true
+        localeFilters += listOf("en")
     }
 
     packaging {
         resources {
             merges += listOf("META-INF/DEPENDENCIES", "META-INF/LICENSE", "META-INF/LICENSE.md", "META-INF/NOTICE")
+            excludes += listOf(
+                "META-INF/*.version",
+                "META-INF/proguard/*",
+                "META-INF/INDEX.LIST",
+                "META-INF/*.kotlin_module",
+                "META-INF/licenses/*"
+            )
         }
     }
     signingConfigs {
@@ -82,15 +91,17 @@ android {
     }
     buildTypes {
         getByName("debug") {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
     lint {
