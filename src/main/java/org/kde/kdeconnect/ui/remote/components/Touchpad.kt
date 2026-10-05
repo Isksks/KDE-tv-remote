@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.kde.kdeconnect.ui.remote.theme.RemoteTheme
 
@@ -29,6 +30,7 @@ fun Touchpad(
     onTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val shape = RoundedCornerShape(24.dp)
     val accentColor = RemoteTheme.colors.icon.copy(alpha = 0.35f)
     
@@ -54,12 +56,15 @@ fun Touchpad(
             }
             .pointerInput(Unit) {
                 detectTapGestures(
-                    onTap = { onTap() }
+                    onTap = {
+                        HapticManager.performPressHaptic(context)
+                        onTap()
+                    }
                 )
             },
         contentAlignment = Alignment.Center
     ) {
-        // Corner bracket accents ⌜ ⌝ LB ⌟
+        // Corner bracket accents ⌜ ⌝ ⌞ ⌟
         Canvas(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             val bracketLength = 16.dp.toPx()
             val bracketRadius = 8.dp.toPx()

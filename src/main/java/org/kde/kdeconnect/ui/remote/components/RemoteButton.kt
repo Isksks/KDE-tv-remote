@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.kde.kdeconnect.ui.remote.theme.RemoteTheme
@@ -35,6 +36,7 @@ fun RemoteButton(
     repeatOnHold: Boolean = false,
     iconTint: Color? = null
 ) {
+    val context = LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -64,7 +66,10 @@ fun RemoteButton(
             interactionSource = interactionSource,
             indication = null,
             enabled = enabled,
-            onClick = onClick
+            onClick = {
+                HapticManager.performPressHaptic(context)
+                onClick()
+            }
         )
     }
 

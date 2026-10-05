@@ -5,7 +5,9 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -17,34 +19,40 @@ fun Modifier.repeatingClick(
     initialDelayMillis: Long = 350L,
     repeatIntervalMillis: Long = 70L,
     onClick: () -> Unit
-): Modifier = if (!enabled) this else this.pointerInput(interactionSource, onClick) {
-    coroutineScope {
-        while (isActive) {
-            val down = awaitPointerEventScope {
-                awaitFirstDown(requireUnconsumed = false)
-            }
-            val press = PressInteraction.Press(down.position)
-
-            val pressJob = launch {
-                interactionSource.emit(press)
-                onClick() // Initial click
-                delay(initialDelayMillis)
-                while (isActive) {
-                    onClick() // Repeating click
-                    delay(repeatIntervalMillis)
+): Modifier = if (!enabled) this else this.composed {
+    val context = LocalContext.current
+    this.pointerInput(interactionSource, onClick) {
+        coroutineScope {
+            while (isActive) {
+                val down = awaitPointerEventScope {
+                    awaitFirstDown(requireUnconsumed = false)
                 }
-            }
+                val press = PressInteraction.Press(down.position)
 
-            val up = awaitPointerEventScope {
-                waitForUpOrCancellation()
-            }
-            pressJob.cancel()
+                val pressJob = launch {
+                    interactionSource.emit(press)
+                    HapticManager.performPressHaptic(context)
+                    onClick() // Initial click
+                    delay(initialDelayMillis)
+                    while (isActive) {
+                        HapticManager.performTickHaptic(context)
+                        onClick() // Repeating click
+                        delay(repeatIntervalMillis)
+                    }
+                }
 
-            launch {
-                if (up != null) {
-                    interactionSource.emit(PressInteraction.Release(press))
-                } else {
-                    interactionSource.emit(PressInteraction.Cancel(press))
+                val up = awaitPointerEventScope {
+                    waitForUpOrCancellation()
+                }
+                pressJob.cancel()
+
+                launch {
+                    if (up != null) {
+                        interactionSource.emit(PressInteraction.Release(press))
+                        HapticManager.performReleaseHaptic(context)
+                    } else {
+                        interactionSource.emit(PressInteraction.Cancel(press))
+                    }
                 }
             }
         }
