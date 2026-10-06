@@ -19,6 +19,7 @@ sealed class VoiceAction {
     data class YouTubeSearch(val query: String) : VoiceAction()
     object OpenYouTube : VoiceAction()
     object OpenTerminal : VoiceAction()
+    data class BrowserSearch(val query: String, val browser: String) : VoiceAction()
     data class OpenApp(val appName: String) : VoiceAction()
     data class OpenClaw(val rawCommand: String) : VoiceAction()
 }
@@ -103,6 +104,8 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application),
         val t = normalizeVoiceText(raw)
         if (t.isEmpty()) return VoiceAction.OpenClaw(raw)
 
+        val browserNames = "(?:chrome|firefox|brave|edge|opera|safari|chromium|vivaldi|browser)"
+
         // 1. Specific YouTube Searches
         Regex("""(?:search|play|find)\s+(.+?)\s+(?:on|in)\s+youtube""").find(t)?.let { match ->
             val query = match.groupValues[1].trim()
@@ -127,7 +130,44 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application),
             return VoiceAction.OpenTerminal
         }
 
-        // 4. General Open App ("open <app>", "launch <app>", "start <app>")
+        // 4. Browser Searches with explicit browser name
+        // Pattern A: "search <query> in/on/using/with <browser>"
+        Regex("""(?:search|look up|google)\s+(?:for\s+)?(.+?)\s+(?:in|on|using|with)\s+$browserNames""").find(t)?.let { match ->
+            val query = match.groupValues[1].trim()
+            val browser = match.groupValues[2].trim()
+            if (query.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
+        }
+
+        // Pattern B: "search in/on/using/with <browser> (for) <query>"
+        Regex("""(?:search|look up|google)\s+(?:in|on|using|with)\s+$browserNames\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
+            val browser = match.groupValues[1].trim()
+            val query = match.groupValues[2].trim()
+            if (query.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
+        }
+
+        // Pattern C: "<browser> search (for) <query>"
+        Regex("""$browserNames\s+(?:search|look up)\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
+            val browser = match.groupValues[1].trim()
+            val query = match.groupValues[2].trim()
+            if (query.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
+        }
+
+        // Pattern D: "open <browser> and search (for) <query>"
+        Regex("""open\s+$browserNames\s+and\s+search\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
+            val browser = match.groupValues[1].trim()
+            val query = match.groupValues[2].trim()
+            if (query.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
+        }
+
+        // 5. General Web Search (e.g. "search quantum computing", "google recipe for pizza")
+        Regex("""^(?:search|google|look up)\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
+            val query = match.groupValues[1].trim()
+            if (query.isNotEmpty() && !query.startsWith("openclaw")) {
+                return VoiceAction.BrowserSearch(query, "browser")
+            }
+        }
+
+        // 6. General Open App ("open <app>", "launch <app>", "start <app>")
         val openAppRegex = Regex("""^(?:open|launch|start|run)\s+(.+)""")
         openAppRegex.find(t)?.let { match ->
             val app = match.groupValues[1].trim()
@@ -136,7 +176,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application),
             }
         }
 
-        // 5. Default: OpenClaw
+        // 7. Default: OpenClaw
         return VoiceAction.OpenClaw(raw)
     }
 
@@ -157,6 +197,28 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application),
                     delay(400)
                     controller.typeText("konsole")
                     controller.select()
+                }
+                is VoiceAction.BrowserSearch -> {
+                    val encodedQuery = URLEncoder.encode(action.query, "UTF-8")
+                    val searchUrl = "https://www.google.com/search?q=$encodedQuery"
+                    if (action.browser == "browser" || action.browser == "default") {
+                        controller.openUrl(searchUrl)
+                    } else {
+                        val cmd = when (action.browser) {
+                            "chrome" -> "google-chrome"
+                            "firefox" -> "firefox"
+                            "brave" -> "brave-browser"
+                            "edge" -> "microsoft-edge"
+                            "opera" -> "opera"
+                            "chromium" -> "chromium"
+                            else -> action.browser
+                        }
+                        controller.openRunDialog()
+                        delay(500)
+                        controller.typeText("$cmd \"$searchUrl\"")
+                        delay(500)
+                        controller.select()
+                    }
                 }
                 is VoiceAction.OpenApp -> {
                     controller.openRunDialog()
