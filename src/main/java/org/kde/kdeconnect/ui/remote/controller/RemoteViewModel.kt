@@ -104,19 +104,19 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application),
         val t = normalizeVoiceText(raw)
         if (t.isEmpty()) return VoiceAction.OpenClaw(raw)
 
-        val browserNames = "(?:chrome|firefox|brave|edge|opera|safari|chromium|vivaldi|browser)"
+        val browserPattern = "(chrome|firefox|brave|edge|opera|safari|chromium|vivaldi|browser)"
 
         // 1. Specific YouTube Searches
         Regex("""(?:search|play|find)\s+(.+?)\s+(?:on|in)\s+youtube""").find(t)?.let { match ->
-            val query = match.groupValues[1].trim()
+            val query = match.groupValues.getOrNull(1)?.trim().orEmpty()
             if (query.isNotEmpty()) return VoiceAction.YouTubeSearch(query)
         }
         Regex("""youtube\s+(?:search|for)\s+(.+)""").find(t)?.let { match ->
-            val query = match.groupValues[1].trim()
+            val query = match.groupValues.getOrNull(1)?.trim().orEmpty()
             if (query.isNotEmpty()) return VoiceAction.YouTubeSearch(query)
         }
         Regex("""open youtube\s+and\s+search\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
-            val query = match.groupValues[1].trim()
+            val query = match.groupValues.getOrNull(1)?.trim().orEmpty()
             if (query.isNotEmpty()) return VoiceAction.YouTubeSearch(query)
         }
 
@@ -132,36 +132,36 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application),
 
         // 4. Browser Searches with explicit browser name
         // Pattern A: "search <query> in/on/using/with <browser>"
-        Regex("""(?:search|look up|google)\s+(?:for\s+)?(.+?)\s+(?:in|on|using|with)\s+$browserNames""").find(t)?.let { match ->
-            val query = match.groupValues[1].trim()
-            val browser = match.groupValues[2].trim()
-            if (query.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
+        Regex("""(?:search|look up|google)\s+(?:for\s+)?(.+?)\s+(?:in|on|using|with)\s+$browserPattern""").find(t)?.let { match ->
+            val query = match.groupValues.getOrNull(1)?.trim().orEmpty()
+            val browser = match.groupValues.getOrNull(2)?.trim().orEmpty()
+            if (query.isNotEmpty() && browser.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
         }
 
         // Pattern B: "search in/on/using/with <browser> (for) <query>"
-        Regex("""(?:search|look up|google)\s+(?:in|on|using|with)\s+$browserNames\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
-            val browser = match.groupValues[1].trim()
-            val query = match.groupValues[2].trim()
-            if (query.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
+        Regex("""(?:search|look up|google)\s+(?:in|on|using|with)\s+$browserPattern\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
+            val browser = match.groupValues.getOrNull(1)?.trim().orEmpty()
+            val query = match.groupValues.getOrNull(2)?.trim().orEmpty()
+            if (query.isNotEmpty() && browser.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
         }
 
         // Pattern C: "<browser> search (for) <query>"
-        Regex("""$browserNames\s+(?:search|look up)\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
-            val browser = match.groupValues[1].trim()
-            val query = match.groupValues[2].trim()
-            if (query.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
+        Regex("""$browserPattern\s+(?:search|look up)\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
+            val browser = match.groupValues.getOrNull(1)?.trim().orEmpty()
+            val query = match.groupValues.getOrNull(2)?.trim().orEmpty()
+            if (query.isNotEmpty() && browser.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
         }
 
         // Pattern D: "open <browser> and search (for) <query>"
-        Regex("""open\s+$browserNames\s+and\s+search\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
-            val browser = match.groupValues[1].trim()
-            val query = match.groupValues[2].trim()
-            if (query.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
+        Regex("""open\s+$browserPattern\s+and\s+search\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
+            val browser = match.groupValues.getOrNull(1)?.trim().orEmpty()
+            val query = match.groupValues.getOrNull(2)?.trim().orEmpty()
+            if (query.isNotEmpty() && browser.isNotEmpty()) return VoiceAction.BrowserSearch(query, browser)
         }
 
         // 5. General Web Search (e.g. "search quantum computing", "google recipe for pizza")
         Regex("""^(?:search|google|look up)\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
-            val query = match.groupValues[1].trim()
+            val query = match.groupValues.getOrNull(1)?.trim().orEmpty()
             if (query.isNotEmpty() && !query.startsWith("openclaw")) {
                 return VoiceAction.BrowserSearch(query, "browser")
             }
@@ -170,7 +170,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application),
         // 6. General Open App ("open <app>", "launch <app>", "start <app>")
         val openAppRegex = Regex("""^(?:open|launch|start|run)\s+(.+)""")
         openAppRegex.find(t)?.let { match ->
-            val app = match.groupValues[1].trim()
+            val app = match.groupValues.getOrNull(1)?.trim().orEmpty()
             if (app.isNotEmpty() && app != "openclaw") {
                 return VoiceAction.OpenApp(app)
             }

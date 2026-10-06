@@ -59,39 +59,23 @@ class BackgroundService : Service() {
 
     fun updateForegroundNotification() {
         val notificationManager = getSystemService<NotificationManager>() ?: return
-        if (!NotificationHelper.isPersistentNotificationEnabled(this)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
-            }
-            notificationManager.cancel(FOREGROUND_NOTIFICATION_ID)
-            return
-        }
 
         val connectedDevices = mutableListOf<String>()
         val connectedDeviceIds = mutableListOf<String>()
-        for (device in applicationInstance.devices.values) {
-            if (device.isReachable && device.isPaired) {
-                connectedDeviceIds.add(device.deviceId)
-                connectedDevices.add(device.name)
+        if (NotificationHelper.isPersistentNotificationEnabled(this)) {
+            for (device in applicationInstance.devices.values) {
+                if (device.isReachable && device.isPaired) {
+                    connectedDeviceIds.add(device.deviceId)
+                    connectedDevices.add(device.name)
+                }
             }
         }
 
-        if (connectedDevices.isNotEmpty()) {
-            val notification = createForegroundNotification(connectedDevices, connectedDeviceIds)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                try {
-                    startForeground(FOREGROUND_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-                } catch (e: Exception) {
-                    notificationManager.notify(FOREGROUND_NOTIFICATION_ID, notification)
-                }
-            } else {
-                startForeground(FOREGROUND_NOTIFICATION_ID, notification)
-            }
-        } else {
-            // Hide / remove notification when no devices are connected
+        val notification = createForegroundNotification(connectedDevices, connectedDeviceIds)
+        startForegroundServiceNotification(notificationManager, notification)
+
+        if (connectedDevices.isEmpty()) {
+            // Remove / hide notification when no devices are connected
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
             } else {
@@ -99,6 +83,25 @@ class BackgroundService : Service() {
                 stopForeground(true)
             }
             notificationManager.cancel(FOREGROUND_NOTIFICATION_ID)
+        }
+    }
+
+    private fun startForegroundServiceNotification(
+        notificationManager: NotificationManager,
+        notification: Notification
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                startForeground(FOREGROUND_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            } catch (e: Exception) {
+                try {
+                    startForeground(FOREGROUND_NOTIFICATION_ID, notification)
+                } catch (e2: Exception) {
+                    notificationManager.notify(FOREGROUND_NOTIFICATION_ID, notification)
+                }
+            }
+        } else {
+            startForeground(FOREGROUND_NOTIFICATION_ID, notification)
         }
     }
 
