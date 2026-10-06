@@ -119,7 +119,13 @@ fun SettingsScreen(
             ManualItem("⚙️ Settings Button", "Opens app options, send files, dark mode, and manual.")
             ManualItem("▶️ Play Button", "Toggles Play / Pause on PC media players.")
             ManualItem("🔇 Mute Button", "Toggles system audio mute / sound zero on PC.")
-            ManualItem("🎙️ Voice Button", "Captures voice command: browser search ('search cats in chrome'), open apps, or OpenClaw.")
+            ManualItem(
+                "🎙️ Voice Button",
+                "Executes 3 types of voice actions:\n" +
+                "• Open Apps: 'open youtube', 'open terminal', 'open chrome'\n" +
+                "• Web Search: 'search cats in chrome', 'search in firefox kotlin'\n" +
+                "• OpenClaw AI: 'write a python script', 'summarize my emails'"
+            )
             ManualItem("🅰️ Button A", "Sends Ctrl+A (Select All) to active window.")
             ManualItem("Ⓒ Button C", "Sends Ctrl+C (Copy) to active window.")
             ManualItem("Ⓥ Button V", "Auto-syncs phone clipboard & sends Ctrl+V (Paste).")
