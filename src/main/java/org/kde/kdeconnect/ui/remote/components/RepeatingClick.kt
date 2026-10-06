@@ -18,6 +18,7 @@ fun Modifier.repeatingClick(
     enabled: Boolean = true,
     initialDelayMillis: Long = 350L,
     repeatIntervalMillis: Long = 70L,
+    repeatHaptics: Boolean = false,
     onClick: () -> Unit
 ): Modifier = if (!enabled) this else this.composed {
     val context = LocalContext.current
@@ -35,7 +36,9 @@ fun Modifier.repeatingClick(
                     onClick() // Initial click
                     delay(initialDelayMillis)
                     while (isActive) {
-                        HapticManager.performTickHaptic(context)
+                        if (repeatHaptics) {
+                            HapticManager.performTickHaptic(context)
+                        }
                         onClick() // Repeating click
                         delay(repeatIntervalMillis)
                     }

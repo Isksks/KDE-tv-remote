@@ -60,6 +60,7 @@ import org.kde.kdeconnect.ui.remote.components.Touchpad
 import org.kde.kdeconnect.ui.remote.components.VerticalVolumeBar
 import org.kde.kdeconnect.ui.remote.controller.ConnectionState
 import org.kde.kdeconnect.ui.remote.controller.RemoteViewModel
+import org.kde.kdeconnect.ui.remote.controller.VoiceAction
 import org.kde.kdeconnect.ui.remote.theme.RemoteTheme
 
 @Composable
@@ -78,11 +79,12 @@ fun RemoteScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            val spokenText = matches?.firstOrNull()
-            if (!spokenText.isNullOrEmpty()) {
-                Toast.makeText(context, "OpenClaw command: $spokenText", Toast.LENGTH_SHORT).show()
-                viewModel.executeOpenClawVoiceCommand(spokenText)
+            val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS).orEmpty()
+            val best = matches.firstOrNull { viewModel.parseVoiceAction(it) !is VoiceAction.OpenClaw }
+                ?: matches.firstOrNull()
+            if (!best.isNullOrEmpty()) {
+                Toast.makeText(context, "Voice command: $best", Toast.LENGTH_SHORT).show()
+                viewModel.executeVoiceCommand(best)
             }
         }
     }
@@ -238,7 +240,7 @@ fun RemoteScreen(
                         onClick = {
                             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak command for OpenClaw...")
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak voice command...")
                             }
                             try {
                                 speechRecognizerLauncher.launch(intent)

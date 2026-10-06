@@ -38,6 +38,7 @@ import org.kde.kdeconnect.plugins.runcommand.RunCommandActivity
 import org.kde.kdeconnect.plugins.runcommand.RunCommandPlugin
 import org.kde.kdeconnect.plugins.share.SendFileActivity
 import org.kde.kdeconnect.ui.MainActivity
+import org.kde.kdeconnect.ui.remote.RemoteActivity
 import org.kde.kdeconnect_tp.R
 
 /**
@@ -57,10 +58,47 @@ class BackgroundService : Service() {
         field = MutableLiveData<Boolean>()
 
     fun updateForegroundNotification() {
-        if (NotificationHelper.isPersistentNotificationEnabled(this)) {
-            // Update the foreground notification with the currently connected device list
-            val notificationManager = getSystemService<NotificationManager>()
-            notificationManager?.notify(FOREGROUND_NOTIFICATION_ID, createForegroundNotification())
+        val notificationManager = getSystemService<NotificationManager>() ?: return
+        if (!NotificationHelper.isPersistentNotificationEnabled(this)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            notificationManager.cancel(FOREGROUND_NOTIFICATION_ID)
+            return
+        }
+
+        val connectedDevices = mutableListOf<String>()
+        val connectedDeviceIds = mutableListOf<String>()
+        for (device in applicationInstance.devices.values) {
+            if (device.isReachable && device.isPaired) {
+                connectedDeviceIds.add(device.deviceId)
+                connectedDevices.add(device.name)
+            }
+        }
+
+        if (connectedDevices.isNotEmpty()) {
+            val notification = createForegroundNotification(connectedDevices, connectedDeviceIds)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    startForeground(FOREGROUND_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+                } catch (e: Exception) {
+                    notificationManager.notify(FOREGROUND_NOTIFICATION_ID, notification)
+                }
+            } else {
+                startForeground(FOREGROUND_NOTIFICATION_ID, notification)
+            }
+        } else {
+            // Hide / remove notification when no devices are connected
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            notificationManager.cancel(FOREGROUND_NOTIFICATION_ID)
         }
     }
 
@@ -149,22 +187,14 @@ class BackgroundService : Service() {
         }
     }
 
-    private fun createForegroundNotification(): Notification {
-        // Why is this needed: https://developer.android.com/guide/components/services#Foreground
-
-        val connectedDevices = mutableListOf<String>()
-        val connectedDeviceIds = mutableListOf<String>()
-        for (device in applicationInstance.devices.values) {
-            if (device.isReachable && device.isPaired) {
-                connectedDeviceIds.add(device.deviceId)
-                connectedDevices.add(device.name)
-            }
-        }
-
-        val intent = Intent(this, MainActivity::class.java)
+    private fun createForegroundNotification(
+        connectedDevices: List<String>,
+        connectedDeviceIds: List<String>
+    ): Notification {
+        // Launch RemoteActivity (new Remote UI)
+        val intent = Intent(this, RemoteActivity::class.java)
         if (connectedDeviceIds.size == 1) {
-            // Force open screen of the only connected device
-            intent.putExtra(MainActivity.EXTRA_DEVICE_ID, connectedDeviceIds[0])
+            intent.putExtra("deviceId", connectedDeviceIds[0])
         }
 
         val pi = PendingIntent.getActivity(this, 0, intent, UPDATE_IMMUTABLE_FLAGS)
@@ -172,7 +202,7 @@ class BackgroundService : Service() {
             setSmallIcon(R.drawable.ic_notification)
             setOngoing(true)
             setContentIntent(pi)
-            setPriority(NotificationCompat.PRIORITY_MIN) //MIN so it's not shown in the status bar before Oreo, on Oreo it will be bumped to LOW
+            setPriority(NotificationCompat.PRIORITY_MIN)
             setShowWhen(false)
             setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             setAutoCancel(false)
@@ -180,42 +210,25 @@ class BackgroundService : Service() {
         }
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            // Pre-oreo, the notification will have an empty title line without this
             notification.setContentTitle(getString(R.string.kde_connect))
         }
 
-        if (connectedDevices.isEmpty()) {
-            notification.setContentText(getString(R.string.foreground_notification_no_devices))
-        }
-        else {
-            notification.setContentText(getString(R.string.foreground_notification_devices, connectedDevices.joinToString(", ")))
+        notification.setContentText(
+            getString(R.string.foreground_notification_devices, connectedDevices.joinToString(", "))
+        )
 
-            // Adding an action button to send clipboard manually in Android 10 and later.
-            if (!ClipboardPlugin.canSyncAutomatically(this)) {
-                val sendClipboard = ClipboardFloatingActivity.getIntent(this, true)
-                val sendPendingClipboard = PendingIntent.getActivity(this, 3, sendClipboard, UPDATE_IMMUTABLE_FLAGS)
-                notification.addAction(0, getString(R.string.foreground_notification_send_clipboard), sendPendingClipboard)
-            }
+        // Removed copy clipboard and file share buttons per request
 
-            if (connectedDeviceIds.size == 1) {
-                val deviceId = connectedDeviceIds[0]
-                val device = KdeConnect.getInstance().getDevice(deviceId)
-                if (device != null) {
-                    // Adding two action buttons only when there is a single device connected.
-                    // Setting up Send File Intent.
-                    val sendFile = Intent(this, SendFileActivity::class.java)
-                    sendFile.putExtra("deviceId", deviceId)
-                    val sendPendingFile = PendingIntent.getActivity(this, 1, sendFile, UPDATE_IMMUTABLE_FLAGS)
-                    notification.addAction(0, getString(R.string.send_files), sendPendingFile)
-
-                    // Checking if there are registered commands and adding the button.
-                    val plugin = device.getPlugin("RunCommandPlugin") as RunCommandPlugin?
-                    if (plugin != null && plugin.commandList.isNotEmpty()) {
-                        val runCommand = Intent(this, RunCommandActivity::class.java)
-                        runCommand.putExtra("deviceId", connectedDeviceIds[0])
-                        val runPendingCommand = PendingIntent.getActivity(this, 2, runCommand, UPDATE_IMMUTABLE_FLAGS)
-                        notification.addAction(0, getString(R.string.pref_plugin_runcommand), runPendingCommand)
-                    }
+        if (connectedDeviceIds.size == 1) {
+            val deviceId = connectedDeviceIds[0]
+            val device = KdeConnect.getInstance().getDevice(deviceId)
+            if (device != null) {
+                val plugin = device.getPlugin("RunCommandPlugin") as RunCommandPlugin?
+                if (plugin != null && plugin.commandList.isNotEmpty()) {
+                    val runCommand = Intent(this, RunCommandActivity::class.java)
+                    runCommand.putExtra("deviceId", connectedDeviceIds[0])
+                    val runPendingCommand = PendingIntent.getActivity(this, 2, runCommand, UPDATE_IMMUTABLE_FLAGS)
+                    notification.addAction(0, getString(R.string.pref_plugin_runcommand), runPendingCommand)
                 }
             }
         }
@@ -236,19 +249,7 @@ class BackgroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(LOG_TAG, "onStartCommand")
-        if (NotificationHelper.isPersistentNotificationEnabled(this)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                try {
-                    startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-                } catch (e: IllegalStateException) { // To catch ForegroundServiceStartNotAllowedException
-                    Log.w("BackgroundService", "Couldn't startForeground", e)
-                    return START_STICKY
-                }
-            }
-            else {
-                startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification())
-            }
-        }
+        updateForegroundNotification()
         if (intent != null && intent.getBooleanExtra("refresh", false)) {
             onNetworkChange(null)
         }

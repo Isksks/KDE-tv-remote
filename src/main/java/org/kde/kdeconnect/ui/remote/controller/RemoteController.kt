@@ -5,6 +5,7 @@ import org.kde.kdeconnect.KdeConnect
 import org.kde.kdeconnect.plugins.clipboard.ClipboardPlugin
 import org.kde.kdeconnect.plugins.mousepad.MousePadPlugin
 import org.kde.kdeconnect.plugins.mpris.MprisPlugin
+import org.kde.kdeconnect.plugins.share.SharePlugin
 import org.kde.kdeconnect.plugins.systemvolume.SystemVolumePlugin
 import kotlin.math.abs
 
@@ -198,6 +199,18 @@ class RemoteController {
             plugin?.sinks?.forEach { sink ->
                 plugin.sendMute(sink.name, !sink.isMute())
             }
+        }
+    }
+
+    fun openUrl(url: String) {
+        val id = getDeviceId() ?: return
+        val plugin = KdeConnect.getInstance().getDevicePlugin(id, SharePlugin::class.java)
+        if (plugin != null) {
+            plugin.sendUrls(listOf(url))
+        } else {
+            openRunDialog()
+            typeText(url)
+            select()
         }
     }
 }

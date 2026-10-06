@@ -13,6 +13,15 @@ import org.kde.kdeconnect.Device
 import org.kde.kdeconnect.KdeConnect
 import org.kde.kdeconnect.PairingHandler
 import org.kde.kdeconnect.plugins.clipboard.ClipboardPlugin
+import java.net.URLEncoder
+
+sealed class VoiceAction {
+    data class YouTubeSearch(val query: String) : VoiceAction()
+    object OpenYouTube : VoiceAction()
+    object OpenTerminal : VoiceAction()
+    data class OpenApp(val appName: String) : VoiceAction()
+    data class OpenClaw(val rawCommand: String) : VoiceAction()
+}
 
 enum class ConnectionState {
     DISCONNECTED, CONNECTING, CONNECTED, ERROR
@@ -82,26 +91,109 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    fun executeOpenClawVoiceCommand(command: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            // 1. Open Terminal
-            controller.openTerminal()
-            delay(400)
-            controller.openRunDialog()
-            delay(400)
-            controller.typeText("konsole")
-            controller.select()
-            delay(1000) // Wait for terminal window to launch and gain focus
+    private fun normalizeVoiceText(s: String): String {
+        return s.lowercase()
+            .replace("you tube", "youtube")
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
 
-            // 2. Launch OpenClaw
-            controller.typeText("openclaw")
-            controller.select()
-            delay(800)
+    fun parseVoiceAction(raw: String): VoiceAction {
+        val t = normalizeVoiceText(raw)
+        if (t.isEmpty()) return VoiceAction.OpenClaw(raw)
 
-            // 3. Send spoken user command
-            controller.typeText(command)
-            controller.select()
+        // 1. Specific YouTube Searches
+        Regex("""(?:search|play|find)\s+(.+?)\s+(?:on|in)\s+youtube""").find(t)?.let { match ->
+            val query = match.groupValues[1].trim()
+            if (query.isNotEmpty()) return VoiceAction.YouTubeSearch(query)
         }
+        Regex("""youtube\s+(?:search|for)\s+(.+)""").find(t)?.let { match ->
+            val query = match.groupValues[1].trim()
+            if (query.isNotEmpty()) return VoiceAction.YouTubeSearch(query)
+        }
+        Regex("""open youtube\s+and\s+search\s+(?:for\s+)?(.+)""").find(t)?.let { match ->
+            val query = match.groupValues[1].trim()
+            if (query.isNotEmpty()) return VoiceAction.YouTubeSearch(query)
+        }
+
+        // 2. Open YouTube directly
+        if (t == "youtube" || t == "open youtube" || t == "launch youtube" || t == "start youtube" || "youtube" in t) {
+            return VoiceAction.OpenYouTube
+        }
+
+        // 3. Open Terminal directly
+        if (Regex("""\b(terminal|konsole|shell|command line)\b""").containsMatchIn(t)) {
+            return VoiceAction.OpenTerminal
+        }
+
+        // 4. General Open App ("open <app>", "launch <app>", "start <app>")
+        val openAppRegex = Regex("""^(?:open|launch|start|run)\s+(.+)""")
+        openAppRegex.find(t)?.let { match ->
+            val app = match.groupValues[1].trim()
+            if (app.isNotEmpty() && app != "openclaw") {
+                return VoiceAction.OpenApp(app)
+            }
+        }
+
+        // 5. Default: OpenClaw
+        return VoiceAction.OpenClaw(raw)
+    }
+
+    fun executeVoiceCommand(rawCommand: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val action = parseVoiceAction(rawCommand)) {
+                is VoiceAction.YouTubeSearch -> {
+                    val encodedQuery = URLEncoder.encode(action.query, "UTF-8")
+                    controller.openUrl("https://www.youtube.com/results?search_query=$encodedQuery")
+                }
+                is VoiceAction.OpenYouTube -> {
+                    controller.openUrl("https://www.youtube.com")
+                }
+                is VoiceAction.OpenTerminal -> {
+                    controller.openTerminal()
+                    delay(400)
+                    controller.openRunDialog()
+                    delay(400)
+                    controller.typeText("konsole")
+                    controller.select()
+                }
+                is VoiceAction.OpenApp -> {
+                    controller.openRunDialog()
+                    delay(500)
+                    controller.typeText(action.appName)
+                    delay(500)
+                    controller.select()
+                }
+                is VoiceAction.OpenClaw -> {
+                    // 1. Open Terminal
+                    controller.openTerminal()
+                    delay(400)
+                    controller.openRunDialog()
+                    delay(400)
+                    controller.typeText("konsole")
+                    controller.select()
+                    delay(1000) // Wait for terminal window to launch and gain focus
+
+                    // 2. Launch OpenClaw
+                    controller.typeText("openclaw")
+                    controller.select()
+                    delay(800)
+
+                    // 3. Send spoken user command
+                    controller.typeText(action.rawCommand)
+                    controller.select()
+
+                    // 4. Send 2nd enter after slight delay
+                    delay(400)
+                    controller.select()
+                }
+            }
+        }
+    }
+
+    fun executeOpenClawVoiceCommand(command: String) {
+        executeVoiceCommand(command)
     }
 
     init {
