@@ -82,6 +82,28 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    fun executeOpenClawVoiceCommand(command: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // 1. Open Terminal
+            controller.openTerminal()
+            delay(400)
+            controller.openRunDialog()
+            delay(400)
+            controller.typeText("konsole")
+            controller.select()
+            delay(1000) // Wait for terminal window to launch and gain focus
+
+            // 2. Launch OpenClaw
+            controller.typeText("openclaw")
+            controller.select()
+            delay(800)
+
+            // 3. Send spoken user command
+            controller.typeText(command)
+            controller.select()
+        }
+    }
+
     init {
         KdeConnect.getInstance().addDeviceListChangedCallback("RemoteViewModel", this)
         refreshDevice()

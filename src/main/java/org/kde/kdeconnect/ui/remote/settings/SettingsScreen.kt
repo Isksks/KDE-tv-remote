@@ -35,6 +35,7 @@ import org.kde.kdeconnect.ui.remote.theme.RemoteTheme
 fun SettingsScreen(
     onBack: () -> Unit,
     onNavigateToSendFile: () -> Unit,
+    onManagePermissions: () -> Unit,
     isDarkMode: Boolean,
     onDarkModeChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -70,6 +71,12 @@ fun SettingsScreen(
                 subtitle = "Send files to connected device",
                 icon = "📁",
                 onClick = onNavigateToSendFile
+            )
+            SettingsItem(
+                title = "Permissions & Auto-Revoke",
+                subtitle = "Disable 'Remove permissions if app is unused'",
+                icon = "🔒",
+                onClick = onManagePermissions
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -112,6 +119,7 @@ fun SettingsScreen(
             ManualItem("⚙️ Settings Button", "Opens app options, send files, dark mode, and manual.")
             ManualItem("▶️ Play Button", "Toggles Play / Pause on PC media players.")
             ManualItem("🔇 Mute Button", "Toggles system audio mute / sound zero on PC.")
+            ManualItem("🎙️ Voice Button", "Captures voice command & executes 'openclaw <command>' in terminal.")
             ManualItem("🅰️ Button A", "Sends Ctrl+A (Select All) to active window.")
             ManualItem("Ⓒ Button C", "Sends Ctrl+C (Copy) to active window.")
             ManualItem("Ⓥ Button V", "Auto-syncs phone clipboard & sends Ctrl+V (Paste).")

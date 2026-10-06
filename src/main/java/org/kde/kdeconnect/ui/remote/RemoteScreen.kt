@@ -1,5 +1,11 @@
 package org.kde.kdeconnect.ui.remote
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +25,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Remove
@@ -37,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -60,10 +68,24 @@ fun RemoteScreen(
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val connectionState by viewModel.connectionState.collectAsState()
     val deviceName by viewModel.deviceName.collectAsState()
     val pairingRequest by viewModel.pairingRequest.collectAsState()
     var showKeyboard by remember { mutableStateOf(false) }
+
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val spokenText = matches?.firstOrNull()
+            if (!spokenText.isNullOrEmpty()) {
+                Toast.makeText(context, "OpenClaw command: $spokenText", Toast.LENGTH_SHORT).show()
+                viewModel.executeOpenClawVoiceCommand(spokenText)
+            }
+        }
+    }
 
     if (pairingRequest != null) {
         val req = pairingRequest!!
@@ -190,10 +212,10 @@ fun RemoteScreen(
                     )
                 }
                 
-                // Second Row: Play, Mute
+                // Second Row: Play, Mute, Voice
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     LabeledPillButton(
@@ -207,6 +229,23 @@ fun RemoteScreen(
                         icon = rememberVectorPainter(Icons.AutoMirrored.Filled.VolumeOff),
                         label = "Mute",
                         onClick = { viewModel.mute() },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    LabeledPillButton(
+                        icon = rememberVectorPainter(Icons.Filled.Mic),
+                        label = "Voice",
+                        onClick = {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak command for OpenClaw...")
+                            }
+                            try {
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
