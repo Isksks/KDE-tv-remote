@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
@@ -37,13 +36,11 @@ fun KeyboardInput(
     onBackspace: () -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
-    
-    // Using TextFieldValue allows us to precisely control the selection cursor.
-    // We maintain a dummy character so the soft keyboard always allows backspace.
-    var textValue by remember { mutableStateOf(TextFieldValue(" ", selection = TextRange(1))) }
+    var textValue by remember { mutableStateOf(TextFieldValue("")) }
 
-    if (showKeyboard) {
-        LaunchedEffect(Unit) {
+    LaunchedEffect(showKeyboard) {
+        if (showKeyboard) {
+            textValue = TextFieldValue("")
             delay(100)
             try {
                 focusRequester.requestFocus()
@@ -51,7 +48,9 @@ fun KeyboardInput(
                 e.printStackTrace()
             }
         }
+    }
 
+    if (showKeyboard) {
         Box(modifier = Modifier.size(1.dp).alpha(0f)) {
             TextField(
                 value = textValue,
@@ -59,35 +58,48 @@ fun KeyboardInput(
                     val oldText = textValue.text
                     val newText = newValue.text
 
-                    if (newText.length < oldText.length) {
-                        // Deletion detected
-                        val deleteCount = oldText.length - newText.length
-                        repeat(deleteCount) { onBackspace() }
-                    } else if (newText.length > oldText.length) {
-                        // Addition detected
-                        val diff = newText.substring(oldText.length)
-                        if (diff == "\n") {
-                            onEnter()
-                        } else {
-                            onKeyTyped(diff)
+                    if (newText.endsWith("\n")) {
+                        val diff = newText.dropLast(1)
+                        if (diff.length > oldText.length) {
+                            val added = diff.substring(oldText.length)
+                            onKeyTyped(added)
                         }
+                        onEnter()
+                        textValue = TextFieldValue("")
+                    } else {
+                        var commonPrefixLen = 0
+                        val maxPrefix = minOf(oldText.length, newText.length)
+                        while (commonPrefixLen < maxPrefix && oldText[commonPrefixLen] == newText[commonPrefixLen]) {
+                            commonPrefixLen++
+                        }
+
+                        val deleteCount = oldText.length - commonPrefixLen
+                        if (deleteCount > 0) {
+                            repeat(deleteCount) { onBackspace() }
+                        }
+
+                        val added = newText.substring(commonPrefixLen)
+                        if (added.isNotEmpty()) {
+                            onKeyTyped(added)
+                        }
+
+                        textValue = newValue
                     }
-                    
-                    // Reset to dummy text so backspace always works and cursor stays at end
-                    textValue = TextFieldValue(" ", selection = TextRange(1))
                 },
                 modifier = Modifier
                     .focusRequester(focusRequester)
-                    // Explicitly catch hardware/software key events as a fallback
                     .onKeyEvent { keyEvent ->
                         if (keyEvent.key == Key.Backspace) {
                             if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
-                                onBackspace()
+                                if (textValue.text.isEmpty()) {
+                                    onBackspace()
+                                }
                             }
                             true
                         } else if (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter) {
                             if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
                                 onEnter()
+                                textValue = TextFieldValue("")
                             }
                             true
                         } else {
@@ -97,10 +109,13 @@ fun KeyboardInput(
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Send,
-                    autoCorrect = false
+                    autoCorrect = true
                 ),
                 keyboardActions = KeyboardActions(
-                    onSend = { onEnter() }
+                    onSend = {
+                        onEnter()
+                        textValue = TextFieldValue("")
+                    }
                 ),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
